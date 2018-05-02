@@ -1,4 +1,4 @@
-//
+Ôªø//
 //
 // Derived from Microsoft Sample IME by Jeremy '13,7,17
 //
@@ -1129,11 +1129,11 @@ void CDIME::showChnEngNotify(BOOL isChinese, UINT delayShow)
 {
 	CStringRange notify;
 	if ((CConfig::GetShowNotifyDesktop() || _IsStoreAppMode()) && _pUIPresenter)
-		_pUIPresenter->ShowNotifyText(&notify.Set(isChinese ? L"§§§Â" : L"≠^§Â", 2), delayShow, CHN_ENG_NOTIFY_DELAY, NOTIFY_CHN_ENG);
+		_pUIPresenter->ShowNotifyText(&notify.Set(isChinese ? L"‰∏≠Êñá" : L"Ëã±Êñá", 2), delayShow, CHN_ENG_NOTIFY_DELAY, NOTIFY_CHN_ENG);
 }
 void CDIME::showFullHalfShapeNotify(BOOL isFullShape, UINT delayShow)
 {
 	CStringRange notify;
 	if ((CConfig::GetShowNotifyDesktop() || _IsStoreAppMode()) && _pUIPresenter)
-		_pUIPresenter->ShowNotifyText(&notify.Set(isFullShape ? L"•˛ßŒ" : L"•bßŒ", 2), delayShow, CHN_ENG_NOTIFY_DELAY, NOTIFY_CHN_ENG);
+		_pUIPresenter->ShowNotifyText(&notify.Set(isFullShape ? L"ÂÖ®ÂΩ¢" : L"ÂçäÂΩ¢", 2), delayShow, CHN_ENG_NOTIFY_DELAY, NOTIFY_CHN_ENG);
 }
