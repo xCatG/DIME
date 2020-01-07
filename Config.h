@@ -36,6 +36,8 @@ public:
 	static UINT GetFontWeight() {return _fontWeight;}
 	static BOOL GetFontItalic() {return _fontItalic;}
 	static void SetFontItalic(BOOL fontItalic) {_fontItalic = fontItalic;}
+	static void SetIMEShiftMode(IME_SHIFT_MODE imeShiftMode) { _imeShiftMode = imeShiftMode ; }
+	static IME_SHIFT_MODE GetIMEShiftMode() { return _imeShiftMode; }
 	static void SetDoubleSingleByteMode(DOUBLE_SINGLE_BYTE_MODE doubleSingleMode) { _doubleSingleByteMode = doubleSingleMode; }
 	static DOUBLE_SINGLE_BYTE_MODE GetDoubleSingleByteMode() { return _doubleSingleByteMode; }
 	static void SetMaxCodes(UINT maxCodes) { _maxCodes = maxCodes;}
@@ -117,12 +119,16 @@ public:
 	static VOID WriteConfig();
 	static VOID LoadConfig(IME_MODE imeMode);
 	
-	static void SetDefaultTextFont();
+	static void SetDefaultTextFont(HWND hWnd = nullptr);
 
 	//configuration propertysheet dialog
 	static INT_PTR CALLBACK CommonPropertyPageWndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	static INT_PTR CALLBACK DictionaryPropertyPageWndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 	friend void DrawColor(HWND hwnd, HDC hdc, COLORREF col);
+
+	//shcore.dll GetDpiForMonitor pointer;
+	static void SetGetDpiForMonitor(_T_GetDpiForMonitor getDpiForMonitor) {	_GetDpiForMonitor = getDpiForMonitor; }
+	
 
 private:
 	//user setting variables
@@ -164,6 +170,8 @@ private:
 
 	static PHONETIC_KEYBOARD_LAYOUT _phoneticKeyboardLayout;
 
+	static IME_SHIFT_MODE _imeShiftMode;
+
 	static DOUBLE_SINGLE_BYTE_MODE _doubleSingleByteMode;
 
 	static BOOL _customTableChanged;
@@ -179,6 +187,9 @@ private:
 
 	static ColorInfo colors[6];
 
+	static UINT _dpiY;
+	static _T_GetDpiForMonitor _GetDpiForMonitor;
+	
 	static BOOL importCustomTableFile(_In_ HWND hDlg, _In_ LPCWSTR pathToLoad);
 	static BOOL exportCustomTableFile(_In_ HWND hDlg, _In_ LPCWSTR pathToWrite);
 	static BOOL parseCINFile(_In_ LPCWSTR pathToLoad, _In_ LPCWSTR pathToWrite, _In_ BOOL customTableMode = FALSE);

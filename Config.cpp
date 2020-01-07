@@ -3,6 +3,7 @@
 #include <Shlobj.h>
 #include <Shlwapi.h>
 #include <MLang.h>
+#include <shellscalingapi.h>
 #include "Globals.h"
 #include "resource.h"
 #include "DIME.h"
@@ -37,7 +38,12 @@ BOOL CConfig::_doHanConvert = FALSE;
 BOOL CConfig::_showNotifyDesktop = TRUE;
 BOOL CConfig::_dayiArticleMode = FALSE;  // Article mode: input full-shaped symbols with address keys
 BOOL CConfig::_customTableChanged = FALSE;
+
+UINT CConfig::_dpiY = 0;
+_T_GetDpiForMonitor CConfig::_GetDpiForMonitor = nullptr;
+
 PHONETIC_KEYBOARD_LAYOUT CConfig::_phoneticKeyboardLayout = PHONETIC_STANDARD_KEYBOARD_LAYOUT;
+IME_SHIFT_MODE CConfig::_imeShiftMode = IME_BOTH_SHIFT;
 DOUBLE_SINGLE_BYTE_MODE CConfig::_doubleSingleByteMode = DOUBLE_SINGLE_BYTE_ALWAYS_SINGLE;
 
 CDIMEArray <LanguageProfileInfo>* CConfig::_reverseConvervsionInfoList = new (std::nothrow) CDIMEArray <LanguageProfileInfo>;
@@ -74,7 +80,7 @@ INT_PTR CALLBACK CConfig::CommonPropertyPageWndProc(HWND hDlg, UINT message, WPA
 	size_t i;
 	WCHAR num[16] = { 0 };
 	WCHAR fontname[LF_FACESIZE] = { 0 };
-	int fontpoint = 12, fontweight = FW_NORMAL, x, y;
+	int fontpoint = 12, fontweight = FW_NORMAL, x, y, logPixelY, LogFontSize;
 	BOOL fontitalic = FALSE;
 	CHOOSEFONT cf;
 	LOGFONT lf;
@@ -125,7 +131,17 @@ INT_PTR CALLBACK CConfig::CommonPropertyPageWndProc(HWND hDlg, UINT message, WPA
 
 		SetDlgItemText(hDlg, IDC_EDIT_FONTNAME, fontname);
 		hdc = GetDC(hDlg);
-		hFont = CreateFont(-MulDiv(10, GetDeviceCaps(hdc, LOGPIXELSY), 72), 0, 0, 0,
+		logPixelY = GetDeviceCaps(hdc, LOGPIXELSY);
+		if (_GetDpiForMonitor)
+		{
+			HMONITOR monitor = MonitorFromWindow(hDlg, MONITOR_DEFAULTTONEAREST);
+			UINT dpiX, dpiY;
+	 		_GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+			if(dpiY > 0) logPixelY = dpiY;
+		}
+		LogFontSize = -MulDiv(10, logPixelY, 72);
+
+		hFont = CreateFont(LogFontSize, 0, 0, 0,
 			fontweight, fontitalic, FALSE, FALSE, DEFAULT_CHARSET,
 			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, fontname);
 		SendMessage(GetDlgItem(hDlg, IDC_EDIT_FONTNAME), WM_SETFONT, (WPARAM)hFont, 0);
@@ -183,13 +199,18 @@ INT_PTR CALLBACK CConfig::CommonPropertyPageWndProc(HWND hDlg, UINT message, WPA
 		CheckDlgButton(hDlg, IDC_CHECKBOX_SPACEASPAGEDOWN, (_spaceAsPageDown) ? BST_CHECKED : BST_UNCHECKED);
 		CheckDlgButton(hDlg, IDC_CHECKBOX_ARROWKEYSWPAGES, (_arrowKeySWPages) ? BST_CHECKED : BST_UNCHECKED);
 		
+		hwnd = GetDlgItem(hDlg, IDC_COMBO_IME_SHIFT_MODE);
+		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"¥ª¥kSHIFTÁä");
+		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"¥kSHIFTÁä");
+		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"¥ªSHIFTÁä");
+		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"µL(¶ÈCtrl-SpaceÁä)");
+		SendMessage(hwnd, CB_SETCURSEL, (WPARAM)_imeShiftMode, 0);
 
 		hwnd = GetDlgItem(hDlg, IDC_COMBO_DOUBLE_SINGLE_BYTE);
 		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"ä»¥ Shift-Space ç†±éµåˆ‡æ›");
 		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"åŠåž‹");
 		SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)L"å…¨åž‹");
 		SendMessage(hwnd, CB_SETCURSEL, (WPARAM)_doubleSingleByteMode, 0);
-
 
 		if (_imeMode == IME_MODE_ARRAY || _imeMode == IME_MODE_PHONETIC)
 		{
@@ -312,6 +333,19 @@ INT_PTR CALLBACK CConfig::CommonPropertyPageWndProc(HWND hDlg, UINT message, WPA
 			switch (HIWORD(wParam))
 			{
 			case EN_CHANGE:
+				PropSheet_Changed(GetParent(hDlg), hDlg);
+				ret = TRUE;
+				break;
+			default:
+				break;
+			}
+			break;
+
+
+		case IDC_COMBO_IME_SHIFT_MODE:
+			switch (HIWORD(wParam))
+			{
+			case CBN_SELCHANGE:
 				PropSheet_Changed(GetParent(hDlg), hDlg);
 				ret = TRUE;
 				break;
@@ -485,11 +519,13 @@ INT_PTR CALLBACK CConfig::CommonPropertyPageWndProc(HWND hDlg, UINT message, WPA
 			_numberColor = colors[4].color;
 			_selectedBGColor = colors[5].color;
 
+			hwnd = GetDlgItem(hDlg, IDC_COMBO_IME_SHIFT_MODE);
+			_imeShiftMode = (IME_SHIFT_MODE)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
+			debugPrint(L"selected IME shift hotkey mode is %d", _imeShiftMode);
+
 			hwnd = GetDlgItem(hDlg, IDC_COMBO_DOUBLE_SINGLE_BYTE);
 			_doubleSingleByteMode = (DOUBLE_SINGLE_BYTE_MODE)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
 			debugPrint(L"selected double single byte mode is %d", _doubleSingleByteMode);
-
-
 
 			hwnd = GetDlgItem(hDlg, IDC_COMBO_REVERSE_CONVERSION);
 			sel = (UINT)SendMessage(hwnd, CB_GETCURSEL, 0, 0);
@@ -842,6 +878,7 @@ VOID CConfig::WriteConfig()
 		fwprintf_s(fp, L"ActivatedKeyboardMode = %d\n", _activatedKeyboardMode ? 1 : 0);
 		fwprintf_s(fp, L"MakePhrase = %d\n", _makePhrase ? 1 : 0);
 		fwprintf_s(fp, L"MaxCodes = %d\n", _maxCodes);
+		fwprintf_s(fp, L"IMEShiftMode  = %d\n", _imeShiftMode);
 		fwprintf_s(fp, L"DoubleSingleByteMode = %d\n", _doubleSingleByteMode);
 		fwprintf_s(fp, L"ShowNotifyDesktop = %d\n", _showNotifyDesktop ? 1 : 0);
 		fwprintf_s(fp, L"DoHanConvert = %d\n", _doHanConvert ? 1 : 0);
@@ -953,7 +990,7 @@ VOID CConfig::LoadConfig(IME_MODE imeMode)
 			{
 				CFile *iniDictionaryFile;
 				iniDictionaryFile = new (std::nothrow) CFile();
-				if (iniDictionaryFile && (iniDictionaryFile)->CreateFile(pwszINIFileName, GENERIC_READ, OPEN_EXISTING, 0))
+				if (iniDictionaryFile && (iniDictionaryFile)->CreateFile(pwszINIFileName, GENERIC_READ, OPEN_EXISTING, FILE_SHARE_READ | FILE_SHARE_WRITE))
 				{
 					CTableDictionaryEngine * iniTableDictionaryEngine;
 					iniTableDictionaryEngine = new (std::nothrow) CTableDictionaryEngine(MAKELCID(1028, SORT_DEFAULT), iniDictionaryFile, INI_DICTIONARY);//CHT:1028
@@ -1052,31 +1089,50 @@ ErrorExit:
 	if (pSD != NULL)
 		LocalFree(pSD);
 	delete[]pwszINIFileName;
-
 }
 
-void CConfig::SetDefaultTextFont()
+void CConfig::SetDefaultTextFont(HWND hWnd)
 {
-	//if(_pCompositionProcessorEngine == nullptr) return;
-	// Candidate Text Font
-	if (Global::defaultlFontHandle != nullptr)
+	debugPrint(L"CConfig::SetDefaultTextFont()");
+	UINT dpiY = 0;
+	if (hWnd && _GetDpiForMonitor)
 	{
+		HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+		UINT dpiX;
+		_GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+	}
+
+	if (Global::defaultlFontHandle != nullptr && (hWnd == nullptr || ( Global::isWindows8 && _dpiY != dpiY) ))
+	{
+		debugPrint(L"CConfig::SetDefaultTextFont() delete old font");
 		DeleteObject((HGDIOBJ)Global::defaultlFontHandle);
 		Global::defaultlFontHandle = nullptr;
 	}
 	if (Global::defaultlFontHandle == nullptr)
 	{
-		Global::defaultlFontHandle = CreateFont(-MulDiv(_fontSize, GetDeviceCaps(GetDC(NULL), LOGPIXELSY), 72),
-			0, 0, 0, _fontWeight, _fontItalic, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, _pFontFaceName);
+		HDC hDC = GetDC(nullptr);
+		int logPixelY = GetDeviceCaps(hDC, LOGPIXELSY);
+		if (Global::isWindows8 && dpiY > 0)
+		{
+			logPixelY = dpiY;
+			_dpiY = dpiY;
+		}
+		int logFontSize = -MulDiv(_fontSize, logPixelY, 72);
+		debugPrint(L"CConfig::SetDefaultTextFont() create new font. Logical y pixels = %d, font size =%d,  log font size = %d, _dpiY = %d",
+			logPixelY, _fontSize, logFontSize, dpiY);
+
+		Global::defaultlFontHandle = CreateFont(logFontSize, 0, 0, 0, _fontWeight, _fontItalic, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, _pFontFaceName);
 		if (!Global::defaultlFontHandle)
 		{
 			LOGFONT lf = { 0 };
 			SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(LOGFONT), &lf, 0);
 			// Fall back to the default GUI font on failure.
-			Global::defaultlFontHandle = CreateFont(-MulDiv(_fontSize, GetDeviceCaps(GetDC(NULL), LOGPIXELSY), 72), 
+			Global::defaultlFontHandle = CreateFont(-MulDiv(_fontSize, GetDeviceCaps(hDC, LOGPIXELSY), 72), 
 				0, 0, 0, FW_MEDIUM, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, lf.lfFaceName);
 		}
+		if(hDC) ReleaseDC(nullptr, hDC);
 	}
+
 }
 
 
@@ -1125,7 +1181,7 @@ BOOL CConfig::importCustomTableFile(_In_ HWND hDlg, _In_ LPCWSTR pathToLoad)
 		HANDLE hCustomTable = NULL;
 		DWORD dwDataLen = 0;
 		LPCWSTR customText = nullptr;
-		if ((hCustomTable = CreateFile(pathToLoad, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
+		if ((hCustomTable = CreateFile(pathToLoad, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
 		{	// Error
 			success = FALSE;
 			goto Cleanup;
@@ -1239,7 +1295,7 @@ BOOL CConfig::exportCustomTableFile(_In_ HWND hDlg, _In_ LPCWSTR pathToWrite)
 	GetDlgItemText(hDlg, IDC_EDIT_CUSTOM_TABLE, buf, len + 1);
 
 	// Create a file to save custom table
-	if ((hCustomTableFile = CreateFile(pathToWrite, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
+	if ((hCustomTableFile = CreateFile(pathToWrite, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
 	{	// Error
 		success = FALSE;
 		goto Cleanup;
